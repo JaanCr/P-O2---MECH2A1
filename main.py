@@ -1,22 +1,76 @@
-import machine
 import time
-import onewire
-import ds18x20
+import board
+from adafruit_onewire.bus import OneWireBus
+import adafruit_ds18x20
 import wifi
 import socketpool
 import asyncio
 from adafruit_httpserver import Server, Request, Response, Websocket, GET
 
 
+####################################################
+#Temperatuur lezen
+####################################################
+#Sensoren mappen op basis van postie in de auto.
+SENSOR_MAP = {
+    "286C8CBC000000C9" : "LinksBoven"
+}
+
+# 1. Initialiseer de OneWire bus op pin GP22
+ow_bus = OneWireBus(board.GP22)
+
+# 2. Scan de bus en maak een lijst van sensor-objecten met hun namen
+def initialiseer_sensoren():
+    gevonden_devices = ow_bus.scan()
+    sensor_lijst = []
+    
+    print(f"Systeem heeft {len(gevonden_devices)} sensoren gevonden op de bus.")
+    
+    for device in gevonden_devices:
+        # Maak het DS18X20 object aan
+        sensor_obj = adafruit_ds18x20.DS18X20(ow_bus, device)
+        
+        # Haal het unieke Hex-ID op
+        id_hex = "".join([f"{b:02X}" for b in device.rom])
+        
+        # Zoek de naam op in onze SENSOR_MAP
+        # Als het ID niet in de lijst staat, gebruiken we "Onbekend" + ID
+        naam = SENSOR_MAP.get(id_hex, f"Onbekend ({id_hex})")
+        
+        sensor_lijst.append({
+            "object": sensor_obj,
+            "naam": naam,
+            "id": id_hex
+        })
+    return sensor_lijst
+
+# Start de initialisatie
+mijn_sensoren = initialiseer_sensoren()
+
+print("-" * 40)
+print(f"{'LOCATIE':<15} | {'TEMPERATUUR':<12}")
+print("-" * 40)
+
+# 3. Main loop voor het uitlezen
+while True:
+    for s in mijn_sensoren:
+        try:
+            # Lees de temperatuur uit
+            temp = s["object"].temperature
+            print(f"{s['naam']:<15} | {temp:>10.2f}°C")
+        except Exception as e:
+            # Als een specifieke sensor faalt, printen we een foutmelding ipv te crashen
+            print(f"{s['naam']:<15} | FOUT: {e}")
+
+    print("-" * 40)
+    
+    # Wacht 5 seconden voor de volgende meting
+    time.sleep(5)
 
 
-
-
-
-#Websocket
-
-
+################################################
 # WiFi access point opstarten
+################################################
 
 AP_SSID = "Air Carditioning"
 AP_PASSWORD = "2026MECH2A1"
@@ -132,40 +186,17 @@ async def main():
     print(f"Server is opgestart en aan het werk!")
     print(f"1. Maak verbinding met Wi-Fi netwerk: '{AP_SSID}'.")
     print(f"2. Passwoord van dit netwerk is: '{AP_PASSWORD}'.")
-    print(f"3. Open http://{ap_ip} in uw browser!")
+    print(f"3. Open http://{ap_ip}:5000 in uw browser!")
     
     await asyncio.gather(
         asyncio.create_task(poll_server()),
         asyncio.create_task(handle_websocket())
     )
 
-# Code runnen
+# Websocket opstarten 
 asyncio.run(main())
 
 
-#code voor sensoren info op te halen
-
-datapin = machine.Pin(22)
-datasensor = ds18x20.DS18X20(onewire.OneWire(datapin))
-
-roms = datasensor.scan()
-aantalsensoren = len(roms)
-
-#checken dat aantal sensoren juist gevonden is en sensoren
-print(f"Aantal gedetecteerde sensoren: {aantalsensoren}")
-print('Adressen: ', roms)
-
-#sensoren om de zoveel tijd lezen
-
-while True:
-    datasensor.convert_temp()
-    time.sleep_ms(1000)
-    for rom in roms:
-        print(rom)
-
-        temp = datasensor.read_temp(rom)
-        print(f"Temperatuur van sensor {rom} = {temp}")
-        print()
 
 
-    time.sleep(5)
+
