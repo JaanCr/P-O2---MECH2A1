@@ -26,11 +26,16 @@
             </section>
             <section class="card">
                 <h2>Controls Links</h2>
-                <p>Temperatuurregeling Links</p>
-                <button onclick="sendCommand('tempUpLinks')">+</button>
-                <button onclick="sendCommand('tempDownLinks')">-</button>
-                <p>Fan Links Aan/Uit</p>
-                <button onclick="sendCommand('FanOnOffLinks')">Toggle Fan</button>
+                <h3>Temperatuurregeling Links</h3>
+                <input type="number" id="inputTempLinks" value="20">
+                <button onclick="setTargetTemp('Links')">Instellen</button>
+                <p>Doel: <span id="doelLinks">20</span>°C</p>
+                <h3>Fan Links</h3>
+                <button onclick="sendCommand('FanOnOffRechts')">Toggle Fan</button>
+                <input type="range" id="fanSliderLinks" min="0" max="100" value="50" 
+                    oninput="updateFanLabel('Links', this.value)" 
+                    onchange="sendFanSpeed('Links', this.value)">
+                <p>Speed: <span id="fanValLinks">50</span>%</p>
             </section>
         </div>
         <div class="kolom">
@@ -41,10 +46,11 @@
             </section>
             <section class="card">
                 <h2>Controls Gemiddelde Temperatuur</h2>
-                <p>Temperatuurregeling Algemeen</p>
-                <button onclick="sendCommand('tempUp')">+</button>
-                <button onclick="sendCommand('tempDown')">-</button>
-                <p>Fans Aan/Uit</p>
+                <h3>Temperatuurregeling Algemeen</h3>
+                <input type="number" id="inputTempLinks" value="20">
+                <button onclick="setTargetTemp('Links')">Instellen</button>
+                <p>Doel: <span id="doelLinks">20</span>°C</p>
+                <h3>Fans Aan/Uit</h3>
                 <button onclick="sendCommand('TurnOnOff')">Aan/Uit</button>
             </section>
         </div> 
@@ -55,11 +61,16 @@
             </section>
             <section class="card">
                 <h2>Controls Rechts</h2>
-                <p>Temperatuurregeling Rechts</p>
-                <button onclick="sendCommand('tempUpRechts')">+</button>
-                <button onclick="sendCommand('tempDownRechts')">-</button>
-                <p>Fan Rechts Aan/Uit</p>
+                <h3>Temperatuurregeling Rechts</h3>
+                <input type="number" id="inputTempRechts" value="20">
+                <button onclick="setTargetTemp('Rechts')">Instellen</button>
+                <p>Doel: <span id="doelRechts">20</span>°C</p>
+                <h3>Fan Rechts</h3>
                 <button onclick="sendCommand('FanOnOffRechts')">Toggle Fan</button>
+                <input type="range" id="fanSliderRechts" min="0" max="100" value="50" 
+                    oninput="updateFanLabel('Rechts', this.value)" 
+                    onchange="sendFanSpeed('Rechts', this.value)">
+                <p>Speed: <span id="fanValRechts">50</span>%</p>
             </section>
         </div>
     </main>
@@ -67,6 +78,7 @@
     <script>
         if (localStorage.getItem("theme") === "dark") {
     document.body.classList.add("dark-mode");
+    updateThemeButton()
 }
 
 let socket;
@@ -133,7 +145,7 @@ function setTargetTemp(kant) {
         // Update de tekst in de UI
         document.getElementById("doel" + kant).textContent = waarde;
     } else {
-        alert("Geen verbinding met de server!");
+        alert("Disconnected");
     }
 }
 
@@ -141,6 +153,29 @@ function toggleDarkMode() {
     document.body.classList.toggle("dark-mode");
     const isDark = document.body.classList.contains("dark-mode");
     localStorage.setItem("theme", isDark ? "dark" : "light");
+    updateThemeButton()
+}
+
+function updateThemeButton() {
+    const btn = document.getElementById("theme-btn");
+    if (!btn) return; // safety check
+    const isDark = document.body.classList.contains("dark-mode");
+    btn.textContent = isDark ? "☀️ Light Mode" : "🌙 Dark Mode";
+}
+
+function updateFanLabel(kant, waarde) {
+    document.getElementById("fanVal" + kant).textContent = waarde;
+}
+
+// Sends the final value to the Pico
+function sendFanSpeed(kant, waarde) {
+    if(socket != undefined && socket.readyState === WebSocket.OPEN) {
+        let commando = "FAN_" + kant.toUpperCase() + "=" + waarde;
+        socket.send(commando);
+        console.log("Sent fan speed:", commando);
+    } else {
+        alert("Disconnected");
+    }
 }
     </script>
 

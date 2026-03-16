@@ -5,7 +5,7 @@
     --text-color: #333333;
 }
 
-/* THE SWITCH LOGIC */
+/* voor switch dark/light */
 body.dark-mode {
     --bg-color: #190303;
     --card-bg: #252525;
@@ -96,3 +96,35 @@ button:active {
     background-color: #004f83;
     transform: scale(1);
 }
+
+input[type="number"] {
+    width: 80px;
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid var(--text-color);
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    font-size: 1.1rem;
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+input[type="range"] {
+    width: 100%;
+    margin: 15px 0;
+    cursor: pointer;
+    accent-color: #3498db; 
+}
+
+#fanValLinks, #fanValRechts {
+    font-weight: bold;
+    color: #3498db;
+}
+

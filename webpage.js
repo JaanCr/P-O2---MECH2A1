@@ -1,5 +1,6 @@
 if (localStorage.getItem("theme") === "dark") {
     document.body.classList.add("dark-mode");
+    updateThemeButton()
 }
 
 let socket;
@@ -66,7 +67,7 @@ function setTargetTemp(kant) {
         // Update de tekst in de UI
         document.getElementById("doel" + kant).textContent = waarde;
     } else {
-        alert("Geen verbinding met de server!");
+        alert("Disconnected");
     }
 }
 
@@ -74,4 +75,28 @@ function toggleDarkMode() {
     document.body.classList.toggle("dark-mode");
     const isDark = document.body.classList.contains("dark-mode");
     localStorage.setItem("theme", isDark ? "dark" : "light");
+    updateThemeButton()
+}
+
+function updateThemeButton() {
+    const btn = document.getElementById("theme-btn");
+    if (!btn) return; // safety check
+    const isDark = document.body.classList.contains("dark-mode");
+    btn.textContent = isDark ? "☀️ Light Mode" : "🌙 Dark Mode";
+}
+
+function updateFanLabel(kant, waarde) {
+    document.getElementById("fanVal" + kant).textContent = waarde;
+}
+
+// Sends the final value to the Pico
+function sendFanSpeed(kant, waarde) {
+    if(socket != undefined && socket.readyState === WebSocket.OPEN) {
+        // Sends: "FAN_LINKS=75"
+        let commando = "FAN_" + kant.toUpperCase() + "=" + waarde;
+        socket.send(commando);
+        console.log("Sent fan speed:", commando);
+    } else {
+        alert("Disconnected");
+    }
 }
