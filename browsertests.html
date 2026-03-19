@@ -5,16 +5,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Air Carditioning</title>
-    
     <link rel="stylesheet" href="style-webpage.css">
 </head>
-
 
 <body onload="connect_socket()">
 
     <header>
         <h1>Air Carditioning</h1>
-        <button id = "theme-btn" onclick="toggleDarkMode()">🌙 Toggle Mode</button>
+        <button id="theme-btn" onclick="toggleDarkMode()">🌙 Toggle Mode</button>
         <p id="status" class="disconnected">Status: Disconnected</p>
     </header>
 
@@ -31,13 +29,15 @@
                 <button onclick="setTargetTemp('Links')">Instellen</button>
                 <p>Doel: <span id="doelLinks">20</span>°C</p>
                 <h3>Fan Links</h3>
-                <button onclick="sendCommand('FanOnOffRechts')">Toggle Fan</button>
-                <input type="range" id="fanSliderLinks" min="0" max="100" value="50" 
-                    oninput="updateFanLabel('Links', this.value)" 
+                <!-- FIX: was 'FanOnOffRechts' -->
+                <button onclick="sendCommand('FanOnOffLinks')">Toggle Fan</button>
+                <input type="range" id="fanSliderLinks" min="0" max="100" value="50"
+                    oninput="updateFanLabel('Links', this.value)"
                     onchange="sendFanSpeed('Links', this.value)">
                 <p>Speed: <span id="fanValLinks">50</span>%</p>
             </section>
         </div>
+
         <div class="kolom">
             <section class="card">
                 <h2>Algemeen</h2>
@@ -47,13 +47,14 @@
             <section class="card">
                 <h2>Controls Gemiddelde Temperatuur</h2>
                 <h3>Temperatuurregeling Algemeen</h3>
-                <input type="number" id="inputTempLinks" value="20">
-                <button onclick="setTargetTemp('Links')">Instellen</button>
-                <p>Doel: <span id="doelLinks">20</span>°C</p>
+                <input type="number" id="inputTempGem" value="20">
+                <button onclick="setTargetTemp('Gem')">Instellen</button>
+                <p>Doel: <span id="doelGem">20</span>°C</p>
                 <h3>Fans Aan/Uit</h3>
                 <button onclick="sendCommand('TurnOnOff')">Aan/Uit</button>
             </section>
-        </div> 
+        </div>
+
         <div class="kolom">
             <section class="card">
                 <h2>Temperatuur Rechts</h2>
@@ -67,117 +68,15 @@
                 <p>Doel: <span id="doelRechts">20</span>°C</p>
                 <h3>Fan Rechts</h3>
                 <button onclick="sendCommand('FanOnOffRechts')">Toggle Fan</button>
-                <input type="range" id="fanSliderRechts" min="0" max="100" value="50" 
-                    oninput="updateFanLabel('Rechts', this.value)" 
+                <input type="range" id="fanSliderRechts" min="0" max="100" value="50"
+                    oninput="updateFanLabel('Rechts', this.value)"
                     onchange="sendFanSpeed('Rechts', this.value)">
                 <p>Speed: <span id="fanValRechts">50</span>%</p>
             </section>
         </div>
     </main>
-    
-    <script>
-        if (localStorage.getItem("theme") === "dark") {
-    document.body.classList.add("dark-mode");
-    updateThemeButton()
-}
 
-let socket;
-
-function connect_socket() {
-    disconnect_socket();
-
-    socket = new WebSocket("ws://" + window.location.host + "/connect-websocket");
-    const o = document.getElementById("status");
-
-    socket.addEventListener("open", (event) => {
-       o.textContent = "Status: Connected";
-       o.className = "connected"; 
-    });
-
-    socket.addEventListener("close", (event) => {
-        o.textContent = "Status: Disconnected";
-        o.className = "disconnected";
-        socket = undefined;
-        setTimeout(() => {
-            connect_socket(); 
-        }, 2500);
-    });
-    
-    socket.addEventListener("message", (event) => {
-        const data = JSON.parse(event.data); 
-        document.getElementById("tempLinks").textContent = data.temperatureLinks;
-        document.getElementById("tempRechts").textContent = data.temperatureRechts;
-        document.getElementById("tempBuiten").textContent = data.temperatureBuiten;
-        document.getElementById("tempGem").textContent = data.temperatureGem;
-    });
-
-    socket.addEventListener("error", (event) => {
-        o.textContent = "Status: Disconnected";
-        o.className = "disconnected";
-    });
-}
-
-function disconnect_socket() {
-    if (socket != undefined) {
-        socket.close();
-        socket = undefined;
-    }
-}
-
-function sendCommand(command) {
-    if(socket != undefined && socket.readyState === WebSocket.OPEN) {
-        socket.send(command);
-    } else {
-        alert("Disconnected");
-    }
-}
-
-// Nieuwe functie voor het instellen van de doeltemperatuur via de input velden
-function setTargetTemp(kant) {
-    if(socket != undefined && socket.readyState === WebSocket.OPEN) {
-        let inputElement = document.getElementById("inputTemp" + kant);
-        let waarde = inputElement.value;
-        
-        // Stuur commando, bijvoorbeeld "TEMP_LINKS=21.5"
-        let commando = "TEMP_" + kant.toUpperCase() + "=" + waarde;
-        socket.send(commando);
-
-        // Update de tekst in de UI
-        document.getElementById("doel" + kant).textContent = waarde;
-    } else {
-        alert("Disconnected");
-    }
-}
-
-function toggleDarkMode() {
-    document.body.classList.toggle("dark-mode");
-    const isDark = document.body.classList.contains("dark-mode");
-    localStorage.setItem("theme", isDark ? "dark" : "light");
-    updateThemeButton()
-}
-
-function updateThemeButton() {
-    const btn = document.getElementById("theme-btn");
-    if (!btn) return; // safety check
-    const isDark = document.body.classList.contains("dark-mode");
-    btn.textContent = isDark ? "☀️ Light Mode" : "🌙 Dark Mode";
-}
-
-function updateFanLabel(kant, waarde) {
-    document.getElementById("fanVal" + kant).textContent = waarde;
-}
-
-// Sends the final value to the Pico
-function sendFanSpeed(kant, waarde) {
-    if(socket != undefined && socket.readyState === WebSocket.OPEN) {
-        let commando = "FAN_" + kant.toUpperCase() + "=" + waarde;
-        socket.send(commando);
-        console.log("Sent fan speed:", commando);
-    } else {
-        alert("Disconnected");
-    }
-}
-    </script>
+    <script src="webpage.js"></script>
 
 </body>
 </html>

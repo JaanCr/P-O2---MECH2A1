@@ -15,8 +15,11 @@ from adafruit_httpserver import Server, Request, Response, Websocket, GET, FileR
 # =========================================================
 
 SENSOR_MAP = {
-    "286C8CBC000000C9": "Links",
-    # Overige sensoren moeten nog getest worden
+    "286C8CBC000000C9": "RechtsBoven",
+    "28697054000000F0": "RechtsOnder",
+    "28DCB6BF0000007F": "LinksBoven",
+    "287F395300000085": "LinksOnder",
+    "28E0DCBF00000043": "Buiten"
 }
 
 
@@ -176,40 +179,53 @@ async def lees_sensoren_taak():
     while True:
         som_binnen = 0.0
         aantal_binnen = 0
-        
+
+        temps = {"LinksBoven": None, "LinksOnder": None, "RechtsBoven": None, "RechtsOnder": None}
+
         for s in mijn_sensoren:
             naam = s["naam"]
             try:
                 temp = s["object"].temperature
-                # Formatteer naar 1 decimaal voor de website
-                temp_str = f"{temp:.1f}"
-                
-                if naam == "Links":
-                    sensor_data["temperatureLinks"] = temp_str
-                    ruwe_temps["Links"] = temp
-                    som_binnen += temp
-                    aantal_binnen += 1
-                elif naam == "Rechts":
-                    sensor_data["temperatureRechts"] = temp_str
-                    ruwe_temps["Rechts"] = temp
-                    som_binnen += temp
-                    aantal_binnen += 1
+                if naam in temps:
+                    temps[naam] = temp
                 elif naam == "Buiten":
-                    sensor_data["temperatureBuiten"] = temp_str
+                    sensor_data["temperatureBuiten"] = f"{temp:.1f}"
             except Exception:
-                if naam in ["Links", "Rechts", "Buiten"]:
-                    sensor_data[f"temperature{naam}"] = "FOUT"
-                    if naam in ruwe_temps:
-                        ruwe_temps[naam] = None
+                if naam == "Buiten":
+                    sensor_data["temperatureBuiten"] = "FOUT"
+
+        # Gemiddelde Links
+        links_waarden = [v for v in [temps["LinksBoven"], temps["LinksOnder"]] if v is not None]
+        if links_waarden:
+            gem_links = sum(links_waarden) / len(links_waarden)
+            sensor_data["temperatureLinks"] = f"{gem_links:.1f}"
+            ruwe_temps["Links"] = gem_links
+            som_binnen += gem_links
+            aantal_binnen += 1
+        else:
+            sensor_data["temperatureLinks"] = "FOUT"
+            ruwe_temps["Links"] = None
+
+        # Gemiddelde Rechts
+        rechts_waarden = [v for v in [temps["RechtsBoven"], temps["RechtsOnder"]] if v is not None]
+        if rechts_waarden:
+            gem_rechts = sum(rechts_waarden) / len(rechts_waarden)
+            sensor_data["temperatureRechts"] = f"{gem_rechts:.1f}"
+            ruwe_temps["Rechts"] = gem_rechts
+            som_binnen += gem_rechts
+            aantal_binnen += 1
+        else:
+            sensor_data["temperatureRechts"] = "FOUT"
+            ruwe_temps["Rechts"] = None
 
         if aantal_binnen > 0:
-            gemiddelde = som_binnen / aantal_binnen
-            sensor_data["temperatureGem"] = f"{gemiddelde:.1f}"
+            sensor_data["temperatureGem"] = f"{som_binnen / aantal_binnen:.1f}"
         else:
             sensor_data["temperatureGem"] = "--"
-            
+
         await asyncio.sleep(2)
 
+ 
 async def regel_hardware_taak():   #regeling van de teperatuur obv gemeten temp en huidige temp
     while True:
         if ruwe_temps["Links"] is not None:
@@ -244,6 +260,13 @@ async def handle_websocket():
                             elif cmd == "TEMP_RECHTS":
                                 peltiers[1].set_target(val_float)
                                 print(f"Doel Rechts -> {val_float}")
+
+                            # Fans regelen op basis van slider input    
+                            elif cmd == "FAN_LINKS":
+                                fan1.set_speed(val_float / 100.0) #set speed verwacht waarde tussen 0-1, slider geeft 0-100
+                            elif cmd == "FAN_RECHTS":
+                                fan2.set_speed(val_float / 100.0)
+    
                         except ValueError:
                             pass
                     else:
@@ -259,6 +282,8 @@ async def handle_websocket():
                             nieuwe_snelheid = 0.0 if (fan1.speed > 0 or fan2.speed > 0) else 1.0
                             fan1.set_speed(nieuwe_snelheid)
                             fan2.set_speed(nieuwe_snelheid)
+                        
+
                 
                 # Huidige temperaturen verzenden als JSON naar websocket
                 json_string = json.dumps(sensor_data)
