@@ -1,5 +1,3 @@
-from typing import Any
-
 import time
 import board
 import pwmio
@@ -102,6 +100,7 @@ class PeltierHBridge:
         # --- Hysteresis Logic ---
         # Cooling Logic
         if current_temp > (self.target + self.deadband):
+            print("cooling")
             if self.current_state == -1: 
                 self._start_switch_pause()
             else:
@@ -110,6 +109,7 @@ class PeltierHBridge:
                 
         # Heating Logic
         elif current_temp < (self.target - self.deadband):
+            print("heating")
             if self.current_state == 1: 
                 self._start_switch_pause()
             else:
@@ -118,6 +118,7 @@ class PeltierHBridge:
                 
         # OFF als in deadband
         elif abs(self.target - current_temp) < (self.deadband / 2):
+            print("deadband")
             self.set_output(0, 0)
             self.current_state = 0
 
