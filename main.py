@@ -94,6 +94,7 @@ class PeltierHBridge:
         if self.is_switching:
             self.set_output(0, 0)
             if now - self.last_switch_time >= self.switch_delay:
+                print("switching klaar")
                 self.is_switching = False
             return
 
