@@ -3,10 +3,198 @@ if (localStorage.getItem("theme") === "dark") {
     updateThemeButton()
 }
 
+class PolynomialGraph {
+    // We hebben lineColor verwijderd en werken nu met dynamische kleuren
+    constructor(canvasId, targetColor) {
+        this.canvas = document.getElementById(canvasId);
+        this.ctx = this.canvas.getContext('2d');
+        this.targetColor = targetColor;
+        
+        this.dataBuffer = []; // Gemeten punten (t, y)
+        this.curves = [];     // Reeds getekende 2de-graadsfuncties
+        this.t = 0;           // Tijd bijhouden
+        this.targetTemp = 20;
+        this.minDisplaySeconds = 200; // Aantal seconden die ten alle tijden zichtbaar moet zijn op de grafieken (aanpassen naargelang testen)
+    }
+
+    setTarget(temp) {
+        this.targetTemp = parseFloat(temp);
+        this.draw();
+    }
+
+    addData(tempStr) {
+        if (tempStr === "--" || tempStr === "FOUT") return;
+        let y = parseFloat(tempStr);
+        this.dataBuffer.push({ t: this.t, y: y });
+
+        // Na 10 seconden (5 metingen): nieuwe parabool tekenen
+        if (this.dataBuffer.length >= 5) {
+            this.calculatePolynomial();
+            this.dataBuffer = [this.dataBuffer[this.dataBuffer.length - 1]]; // Laatste punt behouden als startpunt voor de volgende parabool
+        }
+
+        this.t += 2; 
+        this.draw();
+    }
+    // Berekenen van de tweedegraadsfunctie / parabool
+    calculatePolynomial() {
+    const n = this.dataBuffer.length;
+    let sumX=0, sumX2=0, sumX3=0, sumX4=0;
+    let sumY=0, sumXY=0, sumX2Y=0;
+
+    for (let i = 0; i < n; i++) {
+        let x = i - 2; // -2,-1,0,1,2
+        let y = this.dataBuffer[i].y;
+        sumX  += x;
+        sumX2 += x*x;
+        sumX3 += x*x*x;
+        sumX4 += x*x*x*x;
+        sumY  += y;
+        sumXY += x*y;
+        sumX2Y+= x*x*y;
+    }
+
+    // berekening parameters a, b, c voor de parabool y = ax^2 + bx + c
+    let a = (n * sumX2Y - sumX2 * sumY) / (n * sumX4 - sumX2 * sumX2);
+    let b = sumXY / sumX2;
+    let c = (sumY - a * sumX2) / n;
+
+    this.curves.push({
+        a, b, c,
+        t_center: this.dataBuffer[2].t
+    });
+}
+
+    
+    getColorForTemp(temp) {
+        let diff = temp - this.targetTemp;
+        if (diff > 0.5) return "#3498db";  // Te warm ==> Koelen ==> Blauw
+        if (diff < -0.5) return "#e74c3c"; // Te koud ==> Verwarmen ==> Rood
+        return "#2ecc71";                  // Deadband ==> GOede benadering ==> Groen
+    }
+    // Tekenen van de grafieken
+    draw() {
+        let rect = this.canvas.getBoundingClientRect();
+        if (rect.width === 0) return; 
+        this.canvas.width = rect.width * 2;
+        this.canvas.height = rect.height * 2;
+        
+        let w = this.canvas.width;
+        let h = this.canvas.height;
+        this.ctx.clearRect(0, 0, w, h);
+
+        let textColor = getComputedStyle(document.body).getPropertyValue('--text-color').trim() || '#333';
+
+        let minY = this.targetTemp - 2;
+        let maxY = this.targetTemp + 2;
+        
+        let allY = [];
+        for(let c of this.curves) {
+            for(let x=-2; x<=2; x+=0.5) allY.push(c.a*x*x + c.b*x + c.c);
+        }
+        for(let pt of this.dataBuffer) allY.push(pt.y);
+        
+        if (allY.length > 0) {
+            minY = Math.min(minY, Math.min(...allY) - 1);
+            maxY = Math.max(maxY, Math.max(...allY) + 1);
+        }
+        let rangeY = maxY - minY || 10;
+        let rangeX = Math.max(this.minDisplaySeconds, this.t);  // Altijd minstens ... seconden zichtbaar op de grafiek (aapassen naargelang expereminten)
+
+        let padX = 60, padY = 40;
+        let plotW = w - padX * 2, plotH = h - padY * 2;
+
+        let getX = (time) => padX + (time / rangeX) * plotW;
+        let getY = (val) => padY + plotH - ((val - minY) / rangeY) * plotH;
+
+        // Assen tekenen
+        this.ctx.strokeStyle = textColor;
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        this.ctx.moveTo(padX, padY);
+        this.ctx.lineTo(padX, padY + plotH);
+        this.ctx.lineTo(padX + plotW, padY + plotH);
+        this.ctx.stroke();
+
+        // Doeltemperaturen tekenen, in een kleur verschillend van de grafiek
+        this.ctx.beginPath();
+        this.ctx.strokeStyle = this.targetColor;
+        this.ctx.lineWidth = 3;
+        this.ctx.setLineDash([15, 15]);
+        this.ctx.moveTo(padX, getY(this.targetTemp));
+        this.ctx.lineTo(padX + plotW, getY(this.targetTemp));
+        this.ctx.stroke();
+        this.ctx.setLineDash([]);
+
+        this.ctx.fillStyle = this.targetColor;
+        this.ctx.font = "24px sans-serif";
+        this.ctx.fillText("Doel: " + this.targetTemp + "°C", padX + 10, getY(this.targetTemp) - 15);
+
+        // Functie om lijnsegmenten dynamisch in te kleuren
+        this.ctx.lineWidth = 4;
+        let prevPt = null;
+        let prevPy = null;
+
+        const drawSegment = (t1, y1, t2, y2) => {
+            this.ctx.beginPath();
+            // Kleur bepalen op basis van het gemiddelde van dit specifieke kleine segment
+            this.ctx.strokeStyle = this.getColorForTemp((y1 + y2) / 2);
+            this.ctx.moveTo(getX(t1), getY(y1));
+            this.ctx.lineTo(getX(t2), getY(y2));
+            this.ctx.stroke();
+        };
+        
+        // Tweedegraadsfuncties tekenen 
+        for (let i = 0; i < this.curves.length; i++) {
+            let c = this.curves[i];
+            for (let x = -2; x <= 2; x += 0.2) {
+                let py = c.a * x * x + c.b * x + c.c;
+                let pt = c.t_center + (x * 2); 
+                
+                if (prevPt !== null) { drawSegment(prevPt, prevPy, pt, py); }
+                prevPt = pt;
+                prevPy = py;
+            }
+        }
+        
+        // Teken de lijnen van huidige metingen in de wachtrij
+        for (let pt of this.dataBuffer) {
+            if (prevPt !== null) { drawSegment(prevPt, prevPy, pt.t, pt.y); }
+            prevPt = pt.t;
+            prevPy = pt.y;
+        }
+
+        // Tekenen van de meetpunten met hun corresponderende actuele statuskleur
+        for (let pt of this.dataBuffer) {
+            this.ctx.fillStyle = this.getColorForTemp(pt.y);
+            this.ctx.beginPath();
+            this.ctx.arc(getX(pt.t), getY(pt.y), 6, 0, Math.PI * 2);
+            this.ctx.fill();
+        }
+
+        // Y-as labels
+        this.ctx.fillStyle = textColor;
+        this.ctx.font = "20px sans-serif";
+        this.ctx.textAlign = "right";
+        this.ctx.fillText(maxY.toFixed(1) + "°C", padX - 10, padY + 10);
+        this.ctx.fillText(minY.toFixed(1) + "°C", padX - 10, padY + plotH);
+    }
+}
+
+let graphLinks, graphRechts;
 let socket;
 
 function connect_socket() {
     disconnect_socket();
+
+    if (!graphLinks) {
+        // Doeltemperaturen in oranje tekenen (verschillend van de 3 die op de grafiek worden gebruikt)
+        graphLinks = new PolynomialGraph("graphLinks", "#f39c12");
+        graphRechts = new PolynomialGraph("graphRechts", "#f39c12");
+        
+        graphLinks.setTarget(document.getElementById("doelLinks").textContent);
+        graphRechts.setTarget(document.getElementById("doelRechts").textContent);
+    }
 
     socket = new WebSocket("ws://" + window.location.host + "/connect-websocket");
     const o = document.getElementById("status");
@@ -38,8 +226,7 @@ function connect_socket() {
                 queueMessage.innerHTML = "Een andere persoon heeft de controle op dit moment, u staat <strong>1ste</strong> in de wachtrij.";
             } else {
                 queueMessage.innerHTML = "Een andere persoon heeft de controle op dit moment, u staat <strong>" + x + "de</strong> in de wachtrij."
-            }
-            
+            } 
         }
         
         const updateDot = (id, isOnline) => {
@@ -82,6 +269,9 @@ function connect_socket() {
         document.getElementById("tempRechts").textContent = data.temperatureRechts;
         document.getElementById("tempBuiten").textContent = data.temperatureBuiten;
         document.getElementById("tempGem").textContent = data.temperatureGem;
+
+        if (graphLinks && data.temperatureLinks) graphLinks.addData(data.temperatureLinks);
+        if (graphRechts && data.temperatureRechts) graphRechts.addData(data.temperatureRechts);
     });
 
     socket.addEventListener("error", (event) => {
@@ -116,6 +306,8 @@ function resetAll() {
     document.getElementById("fanSliderRechts").value = 50;
     document.getElementById("fanValLinks").textContent = "50";
     document.getElementById("fanValRechts").textContent = "50";
+    if (graphLinks) graphLinks.setTarget(rw);
+    if (graphRechts) graphRechts.setTarget(rw);
 }
 
 function setTargetTemp(kant) {
@@ -123,6 +315,8 @@ function setTargetTemp(kant) {
         let val = document.getElementById("inputTemp" + kant).value;
         socket.send("TEMP_" + kant.toUpperCase() + "=" + val);
         document.getElementById("doel" + kant).textContent = val;
+        if (kant === "Links") graphLinks.setTarget(val);
+        if (kant === "Rechts") graphRechts.setTarget(val);
     } else { alert("Disconnected"); }
 }
 
@@ -133,6 +327,8 @@ function setGlobalTargetTemp() {
         document.getElementById("doelGem").textContent = val;
         document.getElementById("doelLinks").textContent = val;
         document.getElementById("doelRechts").textContent = val;
+        graphLinks.setTarget(val);
+        graphRechts.setTarget(val);
     } else { alert("Disconnected"); }
 }
 

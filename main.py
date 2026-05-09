@@ -40,33 +40,37 @@ class Fan:
         self.pwm.duty_cycle = int(self.speed * 65535)
 
 class PeltierHBridge:
-    def __init__(self, pin_rpwm, pin_lpwm, Kp=1.0, Ki=0.05, Kd=0.2):
+    #def __init__(self, pin_rpwm, pin_lpwm, Kp=1.0, Ki=0.05, Kd=0.2):
+    def __init__(self, pin_rpwm, pin_lpwm, deadband = 0.5):
         self.rpwm = pwmio.PWMOut(pin_rpwm, frequency=20000, duty_cycle=0)
         self.lpwm = pwmio.PWMOut(pin_lpwm, frequency=20000, duty_cycle=0)
 
-        self.Kp = Kp
-        self.Ki = Ki
-        self.Kd = Kd
+        #self.Kp = Kp    #verwijder als Hysteris
+        #self.Ki = Ki    #
+        #self.Kd = Kd    #
 
-        self.enabled = True # System starts as ON
-        self.integral = 0
-        self.last_error = 0
+        self.deadband = deadband
         self.target = 20.0
-        self.last_direction = 0
+        self.enabled = False # System starts as OFF
+
+        #self.integral = 0       #verwijder als Hysteris
+        self.last_error = 0
+        
+        self.current_state = 0
         self.last_switch_time = time.monotonic()
         self.switch_delay = 4.0  
         self.is_switching = False  
         self.last_update = time.monotonic()
 
-    def reset_pid(self):
-        self.integral = 0
-        self.last_error = 0
+    #def reset_pid(self):        # verwijder als Hysteris + verwijder in stopall logic
+    #    self.integral = 0
+    #    self.last_error = 0
 
     def set_target(self, t):
         self.target = float(t)
 
     def set_output(self, direction, power):
-        power = max(0, min(1, power))
+        #power = max(0, min(1, power))       # verwijder als Hysteris
         duty = int(power * 65535)
 
         if direction == 0:
@@ -80,62 +84,109 @@ class PeltierHBridge:
             self.lpwm.duty_cycle = duty
 
     def update(self, current_temp):
-        if current_temp is None or current_temp < -20 or current_temp > 50 or not self.enabled:
+        if current_temp is None or not self.enabled:
             self.set_output(0, 0)
-            return 0
+            self.current_state = 0
+            return
 
         now = time.monotonic()
-        dt = now - self.last_update
-        self.last_update = now
 
-        if dt <= 0: return 0
-
-        # Ompolingsveiligheid
         if self.is_switching:
             self.set_output(0, 0)
             if now - self.last_switch_time >= self.switch_delay:
+                print("switching klaar")
                 self.is_switching = False
-                self.reset_pid()
-                print("Peltier herstart na polariteitswissel.")
+            return
+
+        # --- Hysteresis Logic ---
+        # Cooling Logic
+        if current_temp > (self.target + self.deadband):
+            print("cooling")
+            if self.current_state == -1: 
+                self._start_switch_pause()
             else:
-                return 0 
-
-        error = self.target - current_temp
-        if abs(error) < 0.1: error = 0
-        self.integral += error * dt
-        self.integral = max(-50, min(50, self.integral))
-        derivative = (error - self.last_error) / dt
-
-        output = self.Kp * error + self.Ki * self.integral + self.Kd * derivative
-        self.last_error = error
-
-        if abs(output) < 0.05:
+                self.set_output(1, 1.0) 
+                self.current_state = 1
+                
+        # Heating Logic
+        elif current_temp < (self.target - self.deadband):
+            print("heating")
+            if self.current_state == 1: 
+                self._start_switch_pause()
+            else:
+                self.set_output(-1, 1.0) 
+                self.current_state = -1
+                
+        # OFF als in deadband
+        elif abs(self.target - current_temp) < (self.deadband / 2):
+            print("deadband")
             self.set_output(0, 0)
-            return 0
+            self.current_state = 0
 
-        desired_direction = 1 if output > 0 else -1
+    def _start_switch_pause(self):
+        print("switching")
+        self.set_output(0, 0)
+        self.current_state = 0
+        self.is_switching = True
+        self.last_switch_time = time.monotonic()
 
-        if desired_direction != self.last_direction and self.last_direction != 0:
-            print(f"Polariteitswissel! Pauze van {self.switch_delay}s.")
-            self.set_output(0, 0)
-            self.last_switch_time = now
-            self.is_switching = True
-            self.last_direction = 0
-            return 0
+    #def update(self, current_temp):
+    #    if current_temp is None or current_temp < -20 or current_temp > 50 or not self.enabled:
+    #        self.set_output(0, 0)
+    #        return 0
 
-        if output > 0:
-            self.last_direction = 1
-            self.set_output(1, min(1, output))
-        else:
-            self.last_direction = -1
-            self.set_output(-1, min(1, -output))
+    #    now = time.monotonic()
+    #    dt = now - self.last_update
+    #    self.last_update = now
 
-        return output
+    #    if dt <= 0: return 0
+
+        # Ompolingsveiligheid
+    #    if self.is_switching:
+    #        self.set_output(0, 0)
+    #        if now - self.last_switch_time >= self.switch_delay:
+    #            self.is_switching = False
+    #            self.reset_pid()
+    #            print("Peltier herstart na polariteitswissel.")
+    #        else:
+    #            return 0 
+
+    #    error = self.target - current_temp
+    #    if abs(error) < 0.1: error = 0
+    #    self.integral += error * dt
+    #    self.integral = max(-50, min(50, self.integral))
+    #    derivative = (error - self.last_error) / dt
+
+    #    output = self.Kp * error + self.Ki * self.integral + self.Kd * derivative
+    #    self.last_error = error
+
+    #    if abs(output) < 0.05:
+    #        self.set_output(0, 0)
+    #        return 0
+
+    #    desired_direction = 1 if output > 0 else -1
+
+    #    if desired_direction != self.current_state and self.current_state != 0:
+    #        print(f"Polariteitswissel! Pauze van {self.switch_delay}s.")
+    #        self.set_output(0, 0)
+    #        self.last_switch_time = now
+    #        self.is_switching = True
+    #        self.current_state = 0
+    #        return 0
+
+    #    if output > 0:
+    #        self.current_state = 1
+    #        self.set_output(1, min(1, output))
+    #    else:
+    #        self.current_state = -1
+    #        self.set_output(-1, min(1, -output))
+
+    #    return output
 
 # =========================================================
 # GLOBALE VARIABELEN & INITIALISATIE
 # =========================================================
-ow_bus = OneWireBus(board.GP22)
+ow_bus = OneWireBus(board.GP21)
 mijn_sensoren = []
 
 sensor_data = {
@@ -150,23 +201,24 @@ sensor_data = {
     "statusBuiten": False,
     "fanStatusLinks": False,
     "fanStatusRechts": False,
-    "peltierEnabledLinks": True,
-    "peltierEnabledRechts": True,
+    "peltierEnabledLinks": False,
+    "peltierEnabledRechts": False,
     "queue_pos": 0 
 }
 
 ruwe_temps = {"Links": None, "Rechts": None}
+
 all_clients = []
 
-fan1 = Fan(board.GP16) # Links
-fan2 = Fan(board.GP17) # Rechts
+fan1 = Fan(board.GP18) # Links
+fan2 = Fan(board.GP13) # Rechts
 
 last_Speed_Fan_Links = 0.5   
 last_Speed_Fan_Rechts = 0.5  
 
 peltiers = [
-    PeltierHBridge(board.GP10, board.GP11),  # Links
-    PeltierHBridge(board.GP13, board.GP14)   # Rechts
+    PeltierHBridge(board.GP16, board.GP17),  # Links
+    PeltierHBridge(board.GP14, board.GP15)   # Rechts
 ]
 
 def initialiseer_sensoren():
@@ -248,7 +300,6 @@ async def handle_websocket():
                     process_incoming_command(data)
 
                 sensor_data["queue_pos"] = index 
-                ws.send_message(json.dumps(sensor_data))
 
                 sensor_data["fanStatusLinks"] = fan1.speed > 0
                 sensor_data["fanStatusRechts"] = fan2.speed > 0
@@ -302,7 +353,7 @@ def process_incoming_command(data):
         elif data == "STOP_ALL":
             fan1.set_speed(0); fan2.set_speed(0)
             for p in peltiers:
-                p.set_output(0, 0); p.enabled = False; p.reset_pid(); p.set_target(20.0)
+                p.set_output(0, 0); p.enabled = False; p.set_target(20.0)
 
 async def regel_hardware_taak():
     while True:

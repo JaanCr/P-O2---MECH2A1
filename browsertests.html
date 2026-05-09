@@ -60,7 +60,7 @@
             <section class="card">
                 <h2>Controls Links</h2>
                 <h3>Temperatuurregeling Links</h3>
-                <input type="number" id="inputTempLinks" class="input-enabled" value="20">
+                <input type="number" id="inputTempLinks" class="input-disabled" value="20">
                 <button onclick="setTargetTemp('Links')">Instellen</button>
                 <p>Doel: <span id="doelLinks">20</span>°C</p>
                 <h3>Fan Links</h3>
@@ -97,7 +97,7 @@
             <section class="card">
                 <h2>Controls Rechts</h2>
                 <h3>Temperatuurregeling Rechts</h3>
-                <input type="number" id="inputTempRechts" class="input-enabled" value="20">
+                <input type="number" id="inputTempRechts" class="input-disabled" value="20">
                 <button onclick="setTargetTemp('Rechts')">Instellen</button>
                 <p>Doel: <span id="doelRechts">20</span>°C</p>
                 <h3>Fan Rechts</h3>
@@ -115,5 +115,23 @@
     <style>
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
+    <main class="grid">
+        <div class="kolom">
+            <section class="card">
+                <h2>Temperatuurverloop Links</h2>
+                <canvas id="graphLinks" style="width: 100%; height: 300px; border-radius: 8px;"></canvas>
+            </section>
+        </div>
+
+        <div class="kolom">
+            </div>
+
+        <div class="kolom">
+            <section class="card">
+                <h2>Temperatuurverloop Rechts</h2>
+                <canvas id="graphRechts" style="width: 100%; height: 300px; border-radius: 8px;"></canvas>
+            </section>
+        </div>
+    </main>
 </body>
 </html>
