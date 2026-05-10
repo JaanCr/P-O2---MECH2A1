@@ -4,7 +4,6 @@ if (localStorage.getItem("theme") === "dark") {
 }
 
 class PolynomialGraph {
-    // We hebben lineColor verwijderd en werken nu met dynamische kleuren
     constructor(canvasId, targetColor) {
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
@@ -27,7 +26,7 @@ class PolynomialGraph {
         let y = parseFloat(tempStr);
         this.dataBuffer.push({ t: this.t, y: y });
 
-        // Na 10 seconden (5 metingen): nieuwe parabool tekenen
+        // Na 10 seconden (5 metingen) nieuwe parabool tekenen
         if (this.dataBuffer.length >= 5) {
             this.calculatePolynomial();
             this.dataBuffer = [this.dataBuffer[this.dataBuffer.length - 1]]; // Laatste punt behouden als startpunt voor de volgende parabool
@@ -72,7 +71,8 @@ class PolynomialGraph {
         if (diff < -0.5) return "#e74c3c"; // Te koud ==> Verwarmen ==> Rood
         return "#2ecc71";                  // Deadband ==> GOede benadering ==> Groen
     }
-    // Tekenen van de grafieken
+
+    // Tekenen van de grafieken en constante lijnen
     draw() {
         let rect = this.canvas.getBoundingClientRect();
         if (rect.width === 0) return; 
@@ -116,7 +116,7 @@ class PolynomialGraph {
         this.ctx.lineTo(padX + plotW, padY + plotH);
         this.ctx.stroke();
 
-        // Doeltemperaturen tekenen, in een kleur verschillend van de grafiek
+        // Doeltemperatuur (middelse volle lijn) tekenen
         this.ctx.beginPath();
         this.ctx.strokeStyle = this.targetColor;
         this.ctx.lineWidth = 3;
@@ -124,13 +124,29 @@ class PolynomialGraph {
         this.ctx.moveTo(padX, getY(this.targetTemp));
         this.ctx.lineTo(padX + plotW, getY(this.targetTemp));
         this.ctx.stroke();
-        this.ctx.setLineDash([]);
+
+        // Deadband grenzen (+0.5 en -0.5) tekenen
+        this.ctx.beginPath();
+        this.ctx.lineWidth = 1; // Dunnere lijn
+        this.ctx.setLineDash([5, 5]); // Fijnere stippellijn
+        
+        // Bovenste grens
+        this.ctx.moveTo(padX, getY(this.targetTemp + 0.5));
+        this.ctx.lineTo(padX + plotW, getY(this.targetTemp + 0.5));
+        
+        // Onderste grens
+        this.ctx.moveTo(padX, getY(this.targetTemp - 0.5));
+        this.ctx.lineTo(padX + plotW, getY(this.targetTemp - 0.5));
+        this.ctx.stroke();
+
+        // "Standaard" lijnstijl voor rest vd grafiek
+        this.ctx.setLineDash([]); 
 
         this.ctx.fillStyle = this.targetColor;
         this.ctx.font = "24px sans-serif";
         this.ctx.fillText("Doel: " + this.targetTemp + "°C", padX + 10, getY(this.targetTemp) - 15);
 
-        // Functie om lijnsegmenten dynamisch in te kleuren
+
         this.ctx.lineWidth = 4;
         let prevPt = null;
         let prevPy = null;
