@@ -97,6 +97,8 @@ class PolynomialGraph {
         this.ctx.clearRect(0, 0, w, h);
 
         let textColor = getComputedStyle(document.body).getPropertyValue('--text-color').trim() || '#333';
+        let gridColor = getComputedStyle(document.body).getPropertyValue('--grid-color').trim() || 'rgba(150, 150, 150, 0.2)';
+        let axisColor = getComputedStyle(document.body).getPropertyValue('--axis-color').trim() || '#333';
 
         let minY = this.targetTemp - 2;
         let maxY = this.targetTemp + 2;
@@ -139,7 +141,7 @@ class PolynomialGraph {
             let yPos = getY(val);
             
             this.ctx.beginPath();
-            this.ctx.strokeStyle = "rgba(150, 150, 150, 0.2)";
+            this.ctx.strokeStyle = gridColor;
             this.ctx.lineWidth = 1.5;
             this.ctx.moveTo(padX, yPos);
             this.ctx.lineTo(padX + plotW, yPos);
@@ -159,7 +161,7 @@ class PolynomialGraph {
             let xPos = getX(xVal);
             
             this.ctx.beginPath();
-            this.ctx.strokeStyle = "rgba(150, 150, 150, 0.2)";
+            this.ctx.strokeStyle = gridColor;
             this.ctx.lineWidth = 1.5;
             this.ctx.moveTo(xPos, padY);
             this.ctx.lineTo(xPos, padY + plotH);
@@ -169,7 +171,7 @@ class PolynomialGraph {
         }
 
         // Assen tekenen
-        this.ctx.strokeStyle = textColor;
+        this.ctx.strokeStyle = axisColor;
         this.ctx.lineWidth = 2;
         this.ctx.beginPath();
         this.ctx.moveTo(padX, padY);
@@ -410,7 +412,9 @@ function toggleDarkMode() {
     document.body.classList.toggle("dark-mode");
     const isDark = document.body.classList.contains("dark-mode");
     localStorage.setItem("theme", isDark ? "dark" : "light");
-    updateThemeButton()
+    updateThemeButton();
+    if (graphLinks)  graphLinks.draw(); 
+    if (graphRechts)  graphRechts.draw(); 
 }
 
 function updateThemeButton() {

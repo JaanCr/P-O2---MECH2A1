@@ -3,6 +3,8 @@
     --bg-color: #e8e8f6;
     --card-bg: #eeeeee;
     --text-color: #333333;
+    --grid-color: rgba(0, 0, 0, 0.15);
+    --axis-color: #333333;
 }
 
 /* voor switch dark/light */
@@ -10,6 +12,8 @@ body.dark-mode {
     --bg-color: #190303;
     --card-bg: #252525;
     --text-color: #f0f0f0;
+    --grid-color:rgba(255, 255, 255, 0.15);
+    --axis-color: #f0f0f0;
 }
 
 /* style website*/
