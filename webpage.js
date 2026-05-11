@@ -14,6 +14,7 @@ class PolynomialGraph {
         this.t = 0;           // Tijd bijhouden
         this.targetTemp = 20;
         this.minDisplaySeconds = 200; // Aantal seconden die ten alle tijden zichtbaar moet zijn op de grafieken (aanpassen naargelang testen)
+        this.lastAddTime = 0; // Tijd van de laatste toegevoegde meting, om te voorkomen dat er te snel achter elkaar metingen worden toegevoegd
     }
 
     setTarget(temp) {
@@ -23,64 +24,76 @@ class PolynomialGraph {
 
     addData(tempStr) {
         if (tempStr === "--" || tempStr === "FOUT") return;
+
+        let now = Date.now();       // Werkelijk verstreken tijd, aangezien websocket 10X per seconde updates stuurt
+        if (this.lastAddTime !== 0 && (now - this.lastAddTime < 1900)) {
+            return;
+        }
+        this.lastAddTime = now;
+
         let y = parseFloat(tempStr);
         this.dataBuffer.push({ t: this.t, y: y });
 
         // Na 10 seconden (5 metingen) nieuwe parabool tekenen
         if (this.dataBuffer.length >= 5) {
             this.calculatePolynomial();
-            this.dataBuffer = [this.dataBuffer[this.dataBuffer.length - 1]]; // Laatste punt behouden als startpunt voor de volgende parabool
+            this.dataBuffer = [this.dataBuffer[this.dataBuffer.length - 1]]; // Laatste punt behouden
         }
 
-        this.t += 2; 
+        this.t += 2; // X-as tijd ophogen
         this.draw();
     }
+
     // Berekenen van de tweedegraadsfunctie / parabool
     calculatePolynomial() {
-    const n = this.dataBuffer.length;
-    let sumX=0, sumX2=0, sumX3=0, sumX4=0;
-    let sumY=0, sumXY=0, sumX2Y=0;
+        const n = this.dataBuffer.length;
+        let sumX=0, sumX2=0, sumX3=0, sumX4=0;
+        let sumY=0, sumXY=0, sumX2Y=0;
 
-    for (let i = 0; i < n; i++) {
-        let x = i - 2; // -2,-1,0,1,2
-        let y = this.dataBuffer[i].y;
-        sumX  += x;
-        sumX2 += x*x;
-        sumX3 += x*x*x;
-        sumX4 += x*x*x*x;
-        sumY  += y;
-        sumXY += x*y;
-        sumX2Y+= x*x*y;
+        for (let i = 0; i < n; i++) {
+            let x = i - 2; // -2,-1,0,1,2
+            let y = this.dataBuffer[i].y;
+            sumX  += x;
+            sumX2 += x*x;
+            sumX3 += x*x*x;
+            sumX4 += x*x*x*x;
+            sumY  += y;
+            sumXY += x*y;
+            sumX2Y+= x*x*y;
+        }
+
+        // berekening parameters a, b, c voor de parabool y = ax^2 + bx + c
+        let a = (n * sumX2Y - sumX2 * sumY) / (n * sumX4 - sumX2 * sumX2);
+        let b = sumXY / sumX2;
+        let c = (sumY - a * sumX2) / n;
+
+        this.curves.push({
+            a, b, c,
+            t_center: this.dataBuffer[2].t
+        });
     }
 
-    // berekening parameters a, b, c voor de parabool y = ax^2 + bx + c
-    let a = (n * sumX2Y - sumX2 * sumY) / (n * sumX4 - sumX2 * sumX2);
-    let b = sumXY / sumX2;
-    let c = (sumY - a * sumX2) / n;
-
-    this.curves.push({
-        a, b, c,
-        t_center: this.dataBuffer[2].t
-    });
-}
-
-    
     getColorForTemp(temp) {
         let diff = temp - this.targetTemp;
         if (diff > 0.5) return "#3498db";  // Te warm ==> Koelen ==> Blauw
         if (diff < -0.5) return "#e74c3c"; // Te koud ==> Verwarmen ==> Rood
-        return "#2ecc71";                  // Deadband ==> GOede benadering ==> Groen
+        return "#2ecc71";                  // Deadband ==> Goede benadering ==> Groen
     }
 
+    // Tekenen van de grafieken en constante lijnen
     // Tekenen van de grafieken en constante lijnen
     draw() {
         let rect = this.canvas.getBoundingClientRect();
         if (rect.width === 0) return; 
-        this.canvas.width = rect.width * 2;
-        this.canvas.height = rect.height * 2;
         
-        let w = this.canvas.width;
-        let h = this.canvas.height;
+        // --- FIX: High-DPI schaling zodat tekst en marges niet krimpen ---
+        const dpr = window.devicePixelRatio || 1;
+        this.canvas.width = rect.width * dpr;
+        this.canvas.height = rect.height * dpr;
+        this.ctx.scale(dpr, dpr);
+        
+        let w = rect.width;  // We gebruiken nu de CSS breedte voor berekeningen
+        let h = rect.height; // We gebruiken nu de CSS hoogte voor berekeningen
         this.ctx.clearRect(0, 0, w, h);
 
         let textColor = getComputedStyle(document.body).getPropertyValue('--text-color').trim() || '#333';
@@ -94,32 +107,37 @@ class PolynomialGraph {
         }
         for(let pt of this.dataBuffer) allY.push(pt.y);
         
+        // Dynamisch de Y-as schalen als de temperatuur buiten de +2 / -2 range valt
         if (allY.length > 0) {
             minY = Math.min(minY, Math.min(...allY) - 1);
             maxY = Math.max(maxY, Math.max(...allY) + 1);
         }
         let rangeY = maxY - minY || 10;
-        let rangeX = Math.max(this.minDisplaySeconds, this.t); 
+        
+        // --- SLIDING WINDOW MATH ---
+        let maxX = Math.max(this.minDisplaySeconds, this.t);
+        let minX = maxX - this.minDisplaySeconds;
+        let rangeX = this.minDisplaySeconds; 
 
-        // Verhoogde padding om cut-off te voorkomen en ruimte te maken voor as-labels
-        let padX = 100, padY = 50; 
+        // Nu de schaling is gefixt, is 80px ruimschoots genoeg voor de labels!
+        let padX = 80, padY = 40; 
         let plotW = w - padX * 2, plotH = h - padY * 2;
 
-        let getX = (time) => padX + (time / rangeX) * plotW;
+        let getX = (time) => padX + ((time - minX) / rangeX) * plotW;
         let getY = (val) => padY + plotH - ((val - minY) / rangeY) * plotH;
 
         this.ctx.fillStyle = textColor;
-        this.ctx.font = "20px sans-serif";
+        // Het font is nu visueel écht 16px
+        this.ctx.font = "16px sans-serif";
 
         // --- ACHTERGROND GRID & Y-AS LABELS ---
         this.ctx.textAlign = "right";
         this.ctx.textBaseline = "middle";
-        let ySteps = 4; // 4 gelijke stappen op de Y-as
+        let ySteps = 4; 
         for (let i = 0; i <= ySteps; i++) {
             let val = minY + (rangeY * (i / ySteps));
             let yPos = getY(val);
             
-            // Horizontale gridlijn
             this.ctx.beginPath();
             this.ctx.strokeStyle = "rgba(150, 150, 150, 0.2)";
             this.ctx.lineWidth = 1.5;
@@ -127,18 +145,19 @@ class PolynomialGraph {
             this.ctx.lineTo(padX + plotW, yPos);
             this.ctx.stroke();
 
-            // Label (bv: 22.0°C)
-            this.ctx.fillText(val.toFixed(1) + "°C", padX - 15, yPos);
+            this.ctx.fillText(val.toFixed(1) + "°C", padX - 10, yPos);
         }
 
-        // --- ACHTERGROND GRID & X-AS LABELS ---
+        // --- ACHTERGROND GRID & X-AS LABELS (SLIDING) ---
         this.ctx.textAlign = "center";
         this.ctx.textBaseline = "top";
-        let xTickInterval = 50; // Label elke 50 seconden
-        for (let xVal = 0; xVal <= rangeX; xVal += xTickInterval) {
+        let xTickInterval = 50; 
+        
+        let firstTick = Math.ceil(minX / xTickInterval) * xTickInterval;
+        
+        for (let xVal = firstTick; xVal <= maxX; xVal += xTickInterval) {
             let xPos = getX(xVal);
             
-            // Verticale gridlijn
             this.ctx.beginPath();
             this.ctx.strokeStyle = "rgba(150, 150, 150, 0.2)";
             this.ctx.lineWidth = 1.5;
@@ -146,11 +165,10 @@ class PolynomialGraph {
             this.ctx.lineTo(xPos, padY + plotH);
             this.ctx.stroke();
 
-            // Label (bv: 100s)
-            this.ctx.fillText(xVal + "s", xPos, padY + plotH + 15);
+            this.ctx.fillText(xVal + "s", xPos, padY + plotH + 10);
         }
 
-        // Assen buitenlijnen tekenen (L-vorm)
+        // Assen tekenen
         this.ctx.strokeStyle = textColor;
         this.ctx.lineWidth = 2;
         this.ctx.beginPath();
@@ -159,7 +177,7 @@ class PolynomialGraph {
         this.ctx.lineTo(padX + plotW, padY + plotH);
         this.ctx.stroke();
 
-        // --- DOELTEMPERATUUR & DEADBAND ---
+        // Doeltemperatuur (Middenlijn)
         this.ctx.beginPath();
         this.ctx.strokeStyle = this.targetColor;
         this.ctx.lineWidth = 3;
@@ -168,23 +186,30 @@ class PolynomialGraph {
         this.ctx.lineTo(padX + plotW, getY(this.targetTemp));
         this.ctx.stroke();
 
+        // Deadband grenzen (+0.5 en -0.5)
         this.ctx.beginPath();
-        this.ctx.lineWidth = 1; 
+        this.ctx.lineWidth = 1;
         this.ctx.setLineDash([5, 5]); 
         this.ctx.moveTo(padX, getY(this.targetTemp + 0.5));
         this.ctx.lineTo(padX + plotW, getY(this.targetTemp + 0.5));
         this.ctx.moveTo(padX, getY(this.targetTemp - 0.5));
         this.ctx.lineTo(padX + plotW, getY(this.targetTemp - 0.5));
         this.ctx.stroke();
+
         this.ctx.setLineDash([]); 
 
         this.ctx.fillStyle = this.targetColor;
-        this.ctx.font = "24px sans-serif";
+        this.ctx.font = "bold 16px sans-serif";
         this.ctx.textAlign = "left";
         this.ctx.textBaseline = "bottom";
-        this.ctx.fillText("Doel: " + this.targetTemp + "°C", padX + 10, getY(this.targetTemp) - 10);
+        this.ctx.fillText("Doel: " + this.targetTemp + "°C", padX + 10, getY(this.targetTemp) - 5);
 
-        // --- DYNAMISCH GEKLEURDE GRAFIEKLIJNEN ---
+        // --- CLIPPING MASK START ---
+        this.ctx.save();
+        this.ctx.beginPath();
+        this.ctx.rect(padX, padY - 10, plotW, plotH + 20);
+        this.ctx.clip();
+
         this.ctx.lineWidth = 4;
         let prevPt = null;
         let prevPy = null;
@@ -197,7 +222,6 @@ class PolynomialGraph {
             this.ctx.stroke();
         };
         
-    
         for (let i = 0; i < this.curves.length; i++) {
             let c = this.curves[i];
             for (let x = -2; x <= 2; x += 0.2) {
@@ -215,13 +239,16 @@ class PolynomialGraph {
             prevPt = pt.t;
             prevPy = pt.y;
         }
-        
+
         for (let pt of this.dataBuffer) {
             this.ctx.fillStyle = this.getColorForTemp(pt.y);
             this.ctx.beginPath();
             this.ctx.arc(getX(pt.t), getY(pt.y), 6, 0, Math.PI * 2);
             this.ctx.fill();
         }
+
+        // --- CLIPPING MASK END ---
+        this.ctx.restore();
     }
 }
 
@@ -310,9 +337,13 @@ function connect_socket() {
         if (data.fanStatusRechts !== undefined) updateFanButton("fanBtnRechts", data.fanStatusRechts);
 
         document.getElementById("tempLinks").textContent = data.temperatureLinks;
+        document.getElementById("tempLinksBoven").textContent = data.temperatureLinksBoven;
+        document.getElementById("tempLinksOnder").textContent = data.temperatureLinksOnder;
         document.getElementById("tempRechts").textContent = data.temperatureRechts;
+        document.getElementById("tempRechtsBoven").textContent = data.temperatureRechtsBoven;
+        document.getElementById("tempRechtsOnder").textContent = data.temperatureRechtsOnder;
         document.getElementById("tempBuiten").textContent = data.temperatureBuiten;
-        document.getElementById("tempGem").textContent = data.temperatureGem;
+        document.getElementById("tempGem").textContent = data.temperatureGem; 
 
         if (graphLinks && data.temperatureLinks) graphLinks.addData(data.temperatureLinks);
         if (graphRechts && data.temperatureRechts) graphRechts.addData(data.temperatureRechts);
@@ -323,7 +354,6 @@ function connect_socket() {
         o.className = "disconnected";
     });
 }
-
 
 function disconnect_socket() { if (socket != undefined) { socket.close(); socket = undefined; } }
 

@@ -55,7 +55,9 @@
         <div class="kolom">
             <section class="card">
                 <h2>Temperatuur Links</h2>
-                <p>Temperatuur Links: <strong><span id="tempLinks">--</span>°C</strong></p>
+                <p>Temperatuur Links Gemiddeld: <strong><span id="tempLinks">--</span>°C</strong></p>
+                <p>Temperatuur LinksBoven: <strong><span id="tempLinksBoven">--</span>°C</strong></p>
+                <p>Temperatuur LinksOnder: <strong><span id="tempLinksOnder">--</span>°C</strong></p>
             </section>
             <section class="card">
                 <h2>Controls Links</h2>
@@ -92,7 +94,9 @@
         <div class="kolom">
             <section class="card">
                 <h2>Temperatuur Rechts</h2>
-                <p>Temperatuur Rechts: <strong><span id="tempRechts">--</span>°C</strong></p>
+                <p>Temperatuur Rechts Gemiddeld: <strong><span id="tempRechts">--</span>°C</strong></p>
+                <p>Temperatuur RechtsBoven: <strong><span id="tempRechtsBoven">--</span>°C</strong></p>
+                <p>Temperatuur RechtsOnder: <strong><span id="tempRechtsOnder">--</span>°C</strong></p>
             </section>
             <section class="card">
                 <h2>Controls Rechts</h2>
@@ -116,7 +120,12 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
     
-<style>
+    <script src="webpage.js"></script>
+
+    <style>
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        
         .grid-graphs {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -124,7 +133,6 @@
             gap: 25px;
             margin: 15px auto;
         }
-        
         @media (max-width: 775px) {
             .grid-graphs { grid-template-columns: 1fr; }
         }
@@ -145,6 +153,5 @@
             </section>
         </div>
     </main>
-
 </body>
 </html>

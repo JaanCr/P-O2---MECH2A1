@@ -191,7 +191,11 @@ mijn_sensoren = []
 
 sensor_data = {
     "temperatureLinks": "--",
+    "temperatureLinksBoven": "--",
+    "temperatureLinksOnder": "--",
     "temperatureRechts": "--",
+    "temperatureRechtsBoven": "--",
+    "temperatureRechtsOnder": "--",
     "temperatureBuiten": "--",
     "temperatureGem": "--",
     "statusLinksBoven": False,
@@ -217,8 +221,8 @@ last_Speed_Fan_Links = 0.5
 last_Speed_Fan_Rechts = 0.5  
 
 peltiers = [
-    PeltierHBridge(board.GP14, board.GP15),  # Links
-    PeltierHBridge(board.GP16, board.GP17)   # Rechts
+    PeltierHBridge(board.GP16, board.GP17),  # Links
+    PeltierHBridge(board.GP14, board.GP15)   # Rechts
 ]
 
 def initialiseer_sensoren():
@@ -269,6 +273,20 @@ async def lees_sensoren_taak():
             sensor_data["temperatureLinks"] = "FOUT"
             ruwe_temps["Links"] = None
 
+        # LinksBoven
+        linksBoven = temps["LinksBoven"]
+        if linksBoven is not None:
+            sensor_data["temperatureLinksBoven"] = f"{linksBoven:.1f}"
+        else:
+            sensor_data["temperatureLinksBoven"] = "--"
+        
+        # LinksOnder
+        linksOnder = temps["LinksOnder"]
+        if linksOnder is not None:
+            sensor_data["temperatureLinksOnder"] = f"{linksOnder:.1f}"
+        else:
+            sensor_data["temperatureLinksOnder"] = "--"
+
         # Gemiddelde Rechts
         rechts_waarden = [v for v in [temps["RechtsBoven"], temps["RechtsOnder"]] if v is not None]
         if rechts_waarden:
@@ -281,6 +299,21 @@ async def lees_sensoren_taak():
             sensor_data["temperatureRechts"] = "FOUT"
             ruwe_temps["Rechts"] = None
 
+        # RechtsBoven
+        rechtsBoven = temps["RechtsBoven"]
+        if rechtsBoven is not None:
+            sensor_data["temperatureRechtsBoven"] = f"{rechtsBoven:.1f}"
+        else:
+            sensor_data["temperatureRechtsBoven"] = "--"
+
+        # RechtsOnder
+        rechtsOnder = temps["RechtsOnder"]
+        if rechtsOnder is not None:
+            sensor_data["temperatureRechtsOnder"] = f"{rechtsOnder:.1f}"
+        else:
+            sensor_data["temperatureRechtsOnder"] = "--"
+
+        # Gemiddelde
         if aantal_binnen > 0:
             sensor_data["temperatureGem"] = f"{som_binnen / aantal_binnen:.1f}"
         else:
