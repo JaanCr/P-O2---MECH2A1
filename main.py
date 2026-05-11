@@ -217,8 +217,8 @@ last_Speed_Fan_Links = 0.5
 last_Speed_Fan_Rechts = 0.5  
 
 peltiers = [
-    PeltierHBridge(board.GP16, board.GP17),  # Links
-    PeltierHBridge(board.GP14, board.GP15)   # Rechts
+    PeltierHBridge(board.GP14, board.GP15),  # Links
+    PeltierHBridge(board.GP16, board.GP17)   # Rechts
 ]
 
 def initialiseer_sensoren():

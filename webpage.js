@@ -99,15 +99,58 @@ class PolynomialGraph {
             maxY = Math.max(maxY, Math.max(...allY) + 1);
         }
         let rangeY = maxY - minY || 10;
-        let rangeX = Math.max(this.minDisplaySeconds, this.t);  // Altijd minstens ... seconden zichtbaar op de grafiek (aapassen naargelang expereminten)
+        let rangeX = Math.max(this.minDisplaySeconds, this.t); 
 
-        let padX = 60, padY = 40;
+        // Verhoogde padding om cut-off te voorkomen en ruimte te maken voor as-labels
+        let padX = 100, padY = 50; 
         let plotW = w - padX * 2, plotH = h - padY * 2;
 
         let getX = (time) => padX + (time / rangeX) * plotW;
         let getY = (val) => padY + plotH - ((val - minY) / rangeY) * plotH;
 
-        // Assen tekenen
+        this.ctx.fillStyle = textColor;
+        this.ctx.font = "20px sans-serif";
+
+        // --- ACHTERGROND GRID & Y-AS LABELS ---
+        this.ctx.textAlign = "right";
+        this.ctx.textBaseline = "middle";
+        let ySteps = 4; // 4 gelijke stappen op de Y-as
+        for (let i = 0; i <= ySteps; i++) {
+            let val = minY + (rangeY * (i / ySteps));
+            let yPos = getY(val);
+            
+            // Horizontale gridlijn
+            this.ctx.beginPath();
+            this.ctx.strokeStyle = "rgba(150, 150, 150, 0.2)";
+            this.ctx.lineWidth = 1.5;
+            this.ctx.moveTo(padX, yPos);
+            this.ctx.lineTo(padX + plotW, yPos);
+            this.ctx.stroke();
+
+            // Label (bv: 22.0°C)
+            this.ctx.fillText(val.toFixed(1) + "°C", padX - 15, yPos);
+        }
+
+        // --- ACHTERGROND GRID & X-AS LABELS ---
+        this.ctx.textAlign = "center";
+        this.ctx.textBaseline = "top";
+        let xTickInterval = 50; // Label elke 50 seconden
+        for (let xVal = 0; xVal <= rangeX; xVal += xTickInterval) {
+            let xPos = getX(xVal);
+            
+            // Verticale gridlijn
+            this.ctx.beginPath();
+            this.ctx.strokeStyle = "rgba(150, 150, 150, 0.2)";
+            this.ctx.lineWidth = 1.5;
+            this.ctx.moveTo(xPos, padY);
+            this.ctx.lineTo(xPos, padY + plotH);
+            this.ctx.stroke();
+
+            // Label (bv: 100s)
+            this.ctx.fillText(xVal + "s", xPos, padY + plotH + 15);
+        }
+
+        // Assen buitenlijnen tekenen (L-vorm)
         this.ctx.strokeStyle = textColor;
         this.ctx.lineWidth = 2;
         this.ctx.beginPath();
@@ -116,7 +159,7 @@ class PolynomialGraph {
         this.ctx.lineTo(padX + plotW, padY + plotH);
         this.ctx.stroke();
 
-        // Doeltemperatuur (middelse volle lijn) tekenen
+        // --- DOELTEMPERATUUR & DEADBAND ---
         this.ctx.beginPath();
         this.ctx.strokeStyle = this.targetColor;
         this.ctx.lineWidth = 3;
@@ -125,42 +168,36 @@ class PolynomialGraph {
         this.ctx.lineTo(padX + plotW, getY(this.targetTemp));
         this.ctx.stroke();
 
-        // Deadband grenzen (+0.5 en -0.5) tekenen
         this.ctx.beginPath();
-        this.ctx.lineWidth = 1; // Dunnere lijn
-        this.ctx.setLineDash([5, 5]); // Fijnere stippellijn
-        
-        // Bovenste grens
+        this.ctx.lineWidth = 1; 
+        this.ctx.setLineDash([5, 5]); 
         this.ctx.moveTo(padX, getY(this.targetTemp + 0.5));
         this.ctx.lineTo(padX + plotW, getY(this.targetTemp + 0.5));
-        
-        // Onderste grens
         this.ctx.moveTo(padX, getY(this.targetTemp - 0.5));
         this.ctx.lineTo(padX + plotW, getY(this.targetTemp - 0.5));
         this.ctx.stroke();
-
-        // "Standaard" lijnstijl voor rest vd grafiek
         this.ctx.setLineDash([]); 
 
         this.ctx.fillStyle = this.targetColor;
         this.ctx.font = "24px sans-serif";
-        this.ctx.fillText("Doel: " + this.targetTemp + "°C", padX + 10, getY(this.targetTemp) - 15);
+        this.ctx.textAlign = "left";
+        this.ctx.textBaseline = "bottom";
+        this.ctx.fillText("Doel: " + this.targetTemp + "°C", padX + 10, getY(this.targetTemp) - 10);
 
-
+        // --- DYNAMISCH GEKLEURDE GRAFIEKLIJNEN ---
         this.ctx.lineWidth = 4;
         let prevPt = null;
         let prevPy = null;
 
         const drawSegment = (t1, y1, t2, y2) => {
             this.ctx.beginPath();
-            // Kleur bepalen op basis van het gemiddelde van dit specifieke kleine segment
             this.ctx.strokeStyle = this.getColorForTemp((y1 + y2) / 2);
             this.ctx.moveTo(getX(t1), getY(y1));
             this.ctx.lineTo(getX(t2), getY(y2));
             this.ctx.stroke();
         };
         
-        // Tweedegraadsfuncties tekenen 
+    
         for (let i = 0; i < this.curves.length; i++) {
             let c = this.curves[i];
             for (let x = -2; x <= 2; x += 0.2) {
@@ -173,27 +210,18 @@ class PolynomialGraph {
             }
         }
         
-        // Teken de lijnen van huidige metingen in de wachtrij
         for (let pt of this.dataBuffer) {
             if (prevPt !== null) { drawSegment(prevPt, prevPy, pt.t, pt.y); }
             prevPt = pt.t;
             prevPy = pt.y;
         }
-
-        // Tekenen van de meetpunten met hun corresponderende actuele statuskleur
+        
         for (let pt of this.dataBuffer) {
             this.ctx.fillStyle = this.getColorForTemp(pt.y);
             this.ctx.beginPath();
             this.ctx.arc(getX(pt.t), getY(pt.y), 6, 0, Math.PI * 2);
             this.ctx.fill();
         }
-
-        // Y-as labels
-        this.ctx.fillStyle = textColor;
-        this.ctx.font = "20px sans-serif";
-        this.ctx.textAlign = "right";
-        this.ctx.fillText(maxY.toFixed(1) + "°C", padX - 10, padY + 10);
-        this.ctx.fillText(minY.toFixed(1) + "°C", padX - 10, padY + plotH);
     }
 }
 
