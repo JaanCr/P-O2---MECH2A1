@@ -282,9 +282,13 @@ function connect_socket() {
         if (data.fanStatusRechts !== undefined) updateFanButton("fanBtnRechts", data.fanStatusRechts);
 
         document.getElementById("tempLinks").textContent = data.temperatureLinks;
+        document.getElementById("tempLinksBoven").textContent = data.temperatureLinksBoven;
+        document.getElementById("tempLinksOnder").textContent = data.temperatureLinksOnder;
         document.getElementById("tempRechts").textContent = data.temperatureRechts;
+        document.getElementById("tempRechtsBoven").textContent = data.temperatureRechtsBoven;
+        document.getElementById("tempRechtsOnder").textContent = data.temperatureRechtsOnder;
         document.getElementById("tempBuiten").textContent = data.temperatureBuiten;
-        document.getElementById("tempGem").textContent = data.temperatureGem;
+        document.getElementById("tempGem").textContent = data.temperatureGem; 
 
         if (graphLinks && data.temperatureLinks) graphLinks.addData(data.temperatureLinks);
         if (graphRechts && data.temperatureRechts) graphRechts.addData(data.temperatureRechts);
