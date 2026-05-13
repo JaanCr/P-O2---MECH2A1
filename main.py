@@ -117,8 +117,15 @@ class PeltierHBridge:
                 self.set_output(-1, 1.0) 
                 self.current_state = -1
                 
-        # OFF als in deadband
-        elif abs(self.target - current_temp) < (self.deadband / 2):
+        # --- OFF als in deadband ---
+        # Heating deadband
+        elif abs(self.target - current_temp) < (self.deadband / 2) and self.current_state == -1:
+            print("deadband")
+            self.set_output(0, 0)
+            self.current_state = 0
+
+        # Cooling deadband
+        elif abs(self.target - current_temp) < (self.deadband / 4) and self.current_state == 1:
             print("deadband")
             self.set_output(0, 0)
             self.current_state = 0
@@ -214,15 +221,15 @@ ruwe_temps = {"Links": None, "Rechts": None}
 
 all_clients = []
 
-fan1 = Fan(board.GP18) # Links
-fan2 = Fan(board.GP13) # Rechts
+fan1 = Fan(board.GP13) # Links
+fan2 = Fan(board.GP18) # Rechts
 
 last_Speed_Fan_Links = 0.5   
 last_Speed_Fan_Rechts = 0.5  
 
 peltiers = [
-    PeltierHBridge(board.GP16, board.GP17),  # Links
-    PeltierHBridge(board.GP14, board.GP15)   # Rechts
+    PeltierHBridge(board.GP14, board.GP15),  # Links
+    PeltierHBridge(board.GP16, board.GP17)   # Rechts
 ]
 
 def initialiseer_sensoren():
