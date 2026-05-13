@@ -119,7 +119,7 @@ class PeltierHBridge:
                 
         # --- OFF als in deadband ---
         # Heating deadband
-        elif abs(self.target - current_temp) < (self.deadband / 2) and self.current_state == -1:
+        elif abs(self.target - current_temp) < (self.deadband * 3 / 4) and self.current_state == -1:
             print("deadband")
             self.set_output(0, 0)
             self.current_state = 0
