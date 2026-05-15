@@ -40,20 +40,14 @@ class Fan:
         self.pwm.duty_cycle = int(self.speed * 65535)
 
 class PeltierHBridge:
-    #def __init__(self, pin_rpwm, pin_lpwm, Kp=1.0, Ki=0.05, Kd=0.2):
     def __init__(self, pin_rpwm, pin_lpwm, deadband = 0.5):
         self.rpwm = pwmio.PWMOut(pin_rpwm, frequency=20000, duty_cycle=0)
         self.lpwm = pwmio.PWMOut(pin_lpwm, frequency=20000, duty_cycle=0)
 
-        #self.Kp = Kp    #verwijder als Hysteris
-        #self.Ki = Ki    #
-        #self.Kd = Kd    #
-
         self.deadband = deadband
         self.target = 20.0
-        self.enabled = False # System starts as OFF
+        self.enabled = False # Peltiers starten OFF
 
-        #self.integral = 0       #verwijder als Hysteris
         self.last_error = 0
         
         self.current_state = 0
@@ -62,15 +56,10 @@ class PeltierHBridge:
         self.is_switching = False  
         self.last_update = time.monotonic()
 
-    #def reset_pid(self):        # verwijder als Hysteris + verwijder in stopall logic
-    #    self.integral = 0
-    #    self.last_error = 0
-
     def set_target(self, t):
         self.target = float(t)
 
     def set_output(self, direction, power):
-        #power = max(0, min(1, power))       # verwijder als Hysteris
         duty = int(power * 65535)
 
         if direction == 0:
@@ -137,58 +126,6 @@ class PeltierHBridge:
         self.is_switching = True
         self.last_switch_time = time.monotonic()
 
-    #def update(self, current_temp):
-    #    if current_temp is None or current_temp < -20 or current_temp > 50 or not self.enabled:
-    #        self.set_output(0, 0)
-    #        return 0
-
-    #    now = time.monotonic()
-    #    dt = now - self.last_update
-    #    self.last_update = now
-
-    #    if dt <= 0: return 0
-
-        # Ompolingsveiligheid
-    #    if self.is_switching:
-    #        self.set_output(0, 0)
-    #        if now - self.last_switch_time >= self.switch_delay:
-    #            self.is_switching = False
-    #            self.reset_pid()
-    #            print("Peltier herstart na polariteitswissel.")
-    #        else:
-    #            return 0 
-
-    #    error = self.target - current_temp
-    #    if abs(error) < 0.1: error = 0
-    #    self.integral += error * dt
-    #    self.integral = max(-50, min(50, self.integral))
-    #    derivative = (error - self.last_error) / dt
-
-    #    output = self.Kp * error + self.Ki * self.integral + self.Kd * derivative
-    #    self.last_error = error
-
-    #    if abs(output) < 0.05:
-    #        self.set_output(0, 0)
-    #        return 0
-
-    #    desired_direction = 1 if output > 0 else -1
-
-    #    if desired_direction != self.current_state and self.current_state != 0:
-    #        print(f"Polariteitswissel! Pauze van {self.switch_delay}s.")
-    #        self.set_output(0, 0)
-    #        self.last_switch_time = now
-    #        self.is_switching = True
-    #        self.current_state = 0
-    #        return 0
-
-    #    if output > 0:
-    #        self.current_state = 1
-    #        self.set_output(1, min(1, output))
-    #    else:
-    #        self.current_state = -1
-    #        self.set_output(-1, min(1, -output))
-
-    #    return output
 
 # =========================================================
 # GLOBALE VARIABELEN & INITIALISATIE
